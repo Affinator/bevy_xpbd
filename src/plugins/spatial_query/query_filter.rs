@@ -81,3 +81,35 @@ impl SpatialQueryFilter {
             )
     }
 }
+
+
+/// Short lived predicate/filter for immediate use cases. 
+/// 
+/// #### Why is this not integrated into SpatialQueryFilter?
+/// 
+/// Due to SpatialQueryFilter being used inside of components the lifetime of
+/// all references inside of SpatialQueryFilter must be 'static. Therefore the 
+/// filter and early_exit_test could only reference 'static objects, which
+/// makes them very hard to use inside of bevy systems since all entities returned
+/// by queries are short-lived and could therefore not be used.
+#[derive(Clone)]
+pub struct SpatialQueryPredicate<'a> {
+    /// A filtering function that is applied to every entity that is queried. Only entities
+    /// that return `true` will be considered for a RayHit.
+    pub filter: &'a dyn Fn(Entity) -> bool
+}
+
+impl<'a> Default for SpatialQueryPredicate<'a> {
+    fn default() -> Self {
+        Self {
+            filter: &|_| true
+        }
+    }
+}
+
+impl<'a> SpatialQueryPredicate<'a> {
+    /// Creates a new [`ImmediateSpatialQueryFilter`] that doesn't exclude any colliders.
+    pub fn new() -> Self {
+        Self::default()
+    }
+}

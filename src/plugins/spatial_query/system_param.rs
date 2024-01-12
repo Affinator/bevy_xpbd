@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::{ecs::system::SystemParam, prelude::*};
+use bevy::ecs::{system::SystemParam, prelude::*};
 
 /// A system parameter for performing [spatial queries](spatial_query).
 ///
@@ -131,6 +131,74 @@ impl<'w, 's> SpatialQuery<'w, 's> {
     ) -> Option<RayHitData> {
         self.query_pipeline
             .cast_ray(origin, direction, max_time_of_impact, solid, query_filter)
+    }
+
+        /// Casts a [ray](spatial_query#raycasting) and computes the closest [hit](RayHitData) with a collider.
+    /// If there are no hits, `None` is returned.
+    ///
+    /// ## Arguments
+    ///
+    /// - `origin`: Where the ray is cast from.
+    /// - `direction`: What direction the ray is cast in.
+    /// - `max_time_of_impact`: The maximum distance that the ray can travel.
+    /// - `solid`: If true and the ray origin is inside of a collider, the hit point will be the ray origin itself.
+    /// Otherwise, the collider will be treated as hollow, and the hit point will be at the collider's boundary.
+    /// - `query_filter`: A [`SpatialQueryFilter`] that determines which colliders are taken into account in the query.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use bevy::prelude::*;
+    /// # #[cfg(feature = "2d")]
+    /// # use bevy_xpbd_2d::prelude::*;
+    /// # #[cfg(feature = "3d")]
+    /// use bevy_xpbd_3d::prelude::*;
+    ///
+    /// # #[cfg(all(feature = "3d", feature = "f32"))]
+    /// fn print_hits(spatial_query: SpatialQuery) {
+    ///     // Cast ray and print first hit
+    ///     if let Some(first_hit) = spatial_query.cast_ray(
+    ///         Vec3::ZERO,                    // Origin
+    ///         Vec3::X,                       // Direction
+    ///         100.0,                         // Maximum time of impact (travel distance)
+    ///         true,                          // Does the ray treat colliders as "solid"
+    ///         SpatialQueryFilter::default(), // Query filter
+    ///     ) {
+    ///         println!("First hit: {:?}", first_hit);
+    ///     }
+    /// }
+    /// ```
+    pub fn cast_ray_predicate(
+        &self,
+        origin: Vector,
+        direction: Vector,
+        max_time_of_impact: Scalar,
+        solid: bool,
+        query_filter: SpatialQueryFilter,
+        predicate: SpatialQueryPredicate
+    ) -> Option<RayHitData> {
+        let mut ray_hit_data_option = self.query_pipeline
+            .cast_ray(origin, direction, max_time_of_impact, solid, query_filter.clone());
+
+        while let Some(ray_hit_data) = ray_hit_data_option {
+            if (predicate.filter)(ray_hit_data.entity) {
+                return Some(ray_hit_data);
+            }                      
+
+            // filter was false or we did not exit early -> ignore this entity and raycast from here again
+            // TODO remove the clone of the HashSet which could be performance intensive in many situations
+            let mut new_query_filter = query_filter.clone();
+            new_query_filter.excluded_entities.insert(ray_hit_data.entity);
+            ray_hit_data_option = self.cast_ray_predicate(
+                origin + (direction * ray_hit_data.time_of_impact),
+                direction,
+                max_time_of_impact,
+                true,
+                new_query_filter,
+                predicate.clone()
+            );   
+        }
+        None
     }
 
     /// Casts a [ray](spatial_query#raycasting) and computes all [hits](RayHitData) until `max_hits` is reached.
