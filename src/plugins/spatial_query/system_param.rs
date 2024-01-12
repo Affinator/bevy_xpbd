@@ -174,11 +174,11 @@ impl<'w, 's> SpatialQuery<'w, 's> {
         direction: Vector,
         max_time_of_impact: Scalar,
         solid: bool,
-        query_filter: SpatialQueryFilter,
+        query_filter: &mut SpatialQueryFilter,
         predicate: SpatialQueryPredicate
     ) -> Option<RayHitData> {
         let mut ray_hit_data_option = self.query_pipeline
-            .cast_ray(origin, direction, max_time_of_impact, solid, query_filter.clone());
+            .cast_ray(origin, direction, max_time_of_impact, solid, query_filter.to_owned());
 
         while let Some(ray_hit_data) = ray_hit_data_option {
             if (predicate.filter)(ray_hit_data.entity) {
@@ -186,15 +186,13 @@ impl<'w, 's> SpatialQuery<'w, 's> {
             }                      
 
             // filter was false or we did not exit early -> ignore this entity and raycast from here again
-            // TODO remove the clone of the HashSet which could be performance intensive in many situations
-            let mut new_query_filter = query_filter.clone();
-            new_query_filter.excluded_entities.insert(ray_hit_data.entity);
+            query_filter.excluded_entities.insert(ray_hit_data.entity);
             ray_hit_data_option = self.cast_ray_predicate(
                 origin + (direction * ray_hit_data.time_of_impact),
                 direction,
                 max_time_of_impact,
                 true,
-                new_query_filter,
+                query_filter,
                 predicate.clone()
             );   
         }

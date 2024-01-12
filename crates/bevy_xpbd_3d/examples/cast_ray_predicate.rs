@@ -163,7 +163,7 @@ fn raycast(
         direction,
         f32::MAX,
         true,
-        SpatialQueryFilter::new(),
+        &mut SpatialQueryFilter::new(),
         SpatialQueryPredicate {
             filter: &|entity| {
                 if let Ok((_, out_of_glass)) = cubes.get(entity) {
